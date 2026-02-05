@@ -1,0 +1,13 @@
+# Failed symbols from nse_symbols.txt
+# Total: 10 out of 2238
+
+ADANIPOWER|Empty data returned
+ADANIGREEN|Empty data returned
+ADANIPORTS|Empty data returned
+AKSHARCHEM|Empty data returned
+AKSHOPTFBR|Empty data returned
+AKUMS|Empty data returned
+ALANKIT|Empty data returned
+AKI|Empty data returned
+AKSHAR|Empty data returned
+AKZOINDIA|Empty data returned

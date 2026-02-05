@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>AI Stock Predictor</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+* {
+ margin: 0;
+ padding: 0;
+ box-sizing: border-box;
+}
+
+body {
+ background: #081421;
+ color: white;
+ font-family: Arial, sans-serif;
+ height: 100vh;
+ display: flex;
+ overflow: hidden;
+}
+
+.left-panel {
+ width: 400px;
+ border-right: 1px solid #1a2f40;
+ display: flex;
+ flex-direction: column;
+ padding: 15px;
+}
+
+.right-panel {
+ flex: 1;
+ display: flex;
+ flex-direction: column;
+ padding: 20px;
+ overflow: auto;
+}
+
+/* Header with market status */
+.header {
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ margin-bottom: 15px;
+ padding-bottom: 10px;
+ border-bottom: 1px solid #1a2f40;
+}
+
+.market-status {
+ font-size: 11px;
+ padding: 4px 8px;
+ border-radius: 12px;
+ display: flex;
+ align-items: center;
+ gap: 5px;
+}
+
+.market-status.open {
+ background: rgba(46, 204, 113, 0.2);
+ color: #2ecc71;
+ border: 1px solid #2ecc71;
+}
+
+.market-status.closed {
+ background: rgba(231, 76, 60, 0.2);
+ color: #e74c3c;
+ border: 1px solid #e74c3c;
+}
+
+.status-dot {
+ width: 8px;
+ height: 8px;
+ border-radius: 50%;
+ background: currentColor;
+ animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+ 0%, 100% { opacity: 1; }
+ 50% { opacity: 0.5; }
+}
+
+/* Search box */
+.search-box {
+ margin-bottom: 15px;
+ position: relative;
+}
+
+.search-box input {
+ width: 100%;
+ padding: 12px;
+ font-size: 16px;
+ border-radius: 5px;
+ border: none;
+ background: #0e2033;
+ color: white;
+ outline: none;
+}
+
+.search-box input:focus {
+ box-shadow: 0 0 0 2px #2ecc71;
+}
+
+#suggestions {
+ background: #0e2033;
+ max-height: 200px;
+ overflow-y: auto;
+ margin-top: 5px;
+ border-radius: 5px;
+ position: absolute;
+ width: 100%;
+ z-index: 100;
+ box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+#suggestions div {
+ padding: 10px;
+ cursor: pointer;
+ border-bottom: 1px solid #1a2f40;
+ transition: background 0.2s;
+}
+
+#suggestions div:hover {
+ background: #1abc9c;
+}
+
+.suggestion-name {
+ font-weight: bold;
+ color: white;
+}
+
+.suggestion-symbol {
+ font-size: 11px;
+ color: #888;
+ margin-top: 2px;
+}
+
+/* Stock list */
+.stock-list {
+ flex: 1;
+ overflow-y: auto;
+ margin-bottom: 10px;
+}
+
+/* Loading skeleton */
+.skeleton {
+ background: linear-gradient(90deg, #0f2236 25%, #1a2f40 50%, #0f2236 75%);
+ background-size: 200% 100%;
+ animation: shimmer 1.5s infinite;
+}
+
+.skeleton-item {
+ background: #0f2236;
+ padding: 12px;
+ margin-bottom: 8px;
+ border-radius: 8px;
+}
+
+.skeleton-line {
+ height: 14px;
+ border-radius: 4px;
+ margin-bottom: 8px;
+}
+
+.skeleton-line:last-child {
+ width: 60%;
+ margin-bottom: 0;
+}
+
+@keyframes shimmer {
+ 0% { background-position: 200% 0; }
+ 100% { background-position: -200% 0; }
+}
+
+/* Stock item */
+.stock-item {
+ background: #0f2236;
+ padding: 12px;
+ margin-bottom: 8px;
+ border-radius: 8px;
+ cursor: pointer;
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ transition: all 0.2s;
+ border-left: 3px solid transparent;
+}
+
+.stock-item:hover {
+ background: #1a2f40;
+ transform: translateX(5px);
+}
+
+.stock-item.up {
+ border-left-color: #2ecc71;
+}
+
+.stock-item.down {
+ border-left-color: #e74c3c;
+}
+
+.stock-item.selected {
+ background: #1a2f40;
+ border-left-width: 5px;
+}
+
+.stock-name {
+ font-size: 13px;
+ font-weight: bold;
+ color: #fff;
+}
+
+.stock-symbol {
+ font-size: 11px;
+ color: #888;
+ margin-top: 2px;
+}
+
+.stock-direction {
+ font-size: 14px;
+ font-weight: bold;
+}
+
+.stock-direction.up {
+ color: #2ecc71;
+}
+
+.stock-direction.down {
+ color: #e74c3c;
+}
+
+.stock-price {
+ font-size: 12px;
+ color: #888;
+ text-align: right;
+}
+
+.prediction-info {
+ font-size: 11px;
+ color: #666;
+ margin-top: 2px;
+}
+
+/* Refresh info bar */
+.refresh-info {
+ font-size: 11px;
+ color: #888;
+ text-align: center;
+ padding: 8px;
+ background: #0e2033;
+ border-radius: 5px;
+ margin-top: 10px;
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ gap: 10px;
+}
+
+.refresh-info .time {
+ color: #2ecc71;
+ font-weight: bold;
+}
+
+.refresh-info .warning {
+ color: #e74c3c;
+ font-size: 10px;
+}
+
+/* Full report */
+.full-report {
+ background: #0f2236;
+ padding: 20px;
+ border-radius: 10px;
+ margin-bottom: 20px;
+}
+
+.full-report h2 {
+ color: #2ecc71;
+ margin-bottom: 5px;
+ font-size: 20px;
+}
+
+.full-report .subtitle {
+ font-size: 12px;
+ color: #888;
+ margin-bottom: 15px;
+}
+
+.full-report .stale-warning {
+ background: rgba(231, 76, 60, 0.2);
+ border: 1px solid #e74c3c;
+ border-radius: 5px;
+ padding: 10px;
+ margin-bottom: 15px;
+ font-size: 12px;
+ color: #e74c3c;
+}
+
+.report-row {
+ display: flex;
+ justify-content: space-between;
+ padding: 8px 0;
+ border-bottom: 1px solid #1a2f40;
+}
+
+.report-row:last-child {
+ border-bottom: none;
+}
+
+.report-label {
+ color: #888;
+}
+
+.report-value {
+ font-weight: bold;
+}
+
+.report-value.up {
+ color: #2ecc71;
+}
+
+.report-value.down {
+ color: #e74c3c;
+}
+
+/* Chart container */
+.chart-container {
+ background: #07101c;
+ border-radius: 10px;
+ padding: 15px;
+ flex: 1;
+ min-height: 300px;
+}
+
+.chart-container canvas {
+ width: 100% !important;
+ height: auto !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+ width: 8px;
+}
+
+::-webkit-scrollbar-track {
+ background: #0e2033;
+}
+
+::-webkit-scrollbar-thumb {
+ background: #1a2f40;
+ border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+ background: #2ecc71;
+}
+
+/* Manual refresh button */
+.refresh-btn {
+ background: none;
+ border: 1px solid #2ecc71;
+ color: #2ecc71;
+ padding: 5px 10px;
+ border-radius: 5px;
+ cursor: pointer;
+ font-size: 11px;
+ transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+ background: #2ecc71;
+ color: #081421;
+}
+
+.refresh-btn:disabled {
+ opacity: 0.5;
+ cursor: not-allowed;
+}
+</style>
+</head>
+<body>
+
+<div class="left-panel">
+ <div class="header">
+  <h2 style="color:#2ecc71;">AI Stock Predictor</h2>
+  <div class="market-status" id="marketStatus">
+   <span class="status-dot"></span>
+   <span>Checking...</span>
+  </div>
+ </div>
+ 
+ <div class="search-box">
+  <input id="search" placeholder="Search stock..." onkeyup="suggest(this.value)">
+  <div id="suggestions"></div>
+ </div>
+ 
+ <div class="stock-list" id="stockList">
+  <!-- Skeleton loader shown initially -->
+  <div class="skeleton skeleton-item"></div>
+  <div class="skeleton skeleton-item"></div>
+  <div class="skeleton skeleton-item"></div>
+  <div class="skeleton skeleton-item"></div>
+  <div class="skeleton skeleton-item"></div>
+ </div>
+ 
+ <div class="refresh-info" id="refreshInfo">
+  <span id="lastUpdated">Last updated: --</span>
+  <span>
+   <button class="refresh-btn" onclick="manualRefresh()">↻ Refresh</button>
+   <span class="time" id="countdown">30s</span>
+  </span>
+ </div>
+</div>
+
+<div class="right-panel">
+ <div class="full-report" id="fullReport">
+  <h2>Select a stock</h2>
+  <p class="subtitle">Click on any stock from the list to see full analysis</p>
+ </div>
+ 
+ <div class="chart-container">
+  <canvas id="priceChart"></canvas>
+ </div>
+</div>
+
+<script>
+// API Configuration - Change this to your deployed backend URL
+const API_BASE = "http://127.0.0.1:8001";  // Local development
+// const API_BASE = "https://your-backend.herokuapp.com";  // For production deployment
+
+// Auto-detect API URL based on environment
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+if (!isLocalhost) {
+    // When deployed, you need to deploy backend separately (e.g., on Render, Railway, Heroku)
+    // For now, show a message if not localhost
+    console.log("Note: For production, deploy backend to a service like Render, Railway, or Heroku");
+}
+
+// Global state
+let ALL = [];
+let allPredictions = [];
+let selectedStock = null;
+let chart = null;
+let countdownTimer = null;
+let secondsLeft = 30;
+let isRefreshing = false;
+let lastUpdatedTime = null;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    // Load market status
+    updateMarketStatus();
+    
+    // Load symbols and predictions
+    loadSymbols();
+    
+    // Start countdown timer
+    startCountdown();
+    
+    // Update market status periodically
+    setInterval(updateMarketStatus, 60000); // Every minute
+});
+
+// Load symbols from backend
+function loadSymbols() {
+    fetch(API_BASE + "/symbols")
+        .then(r => r.json())
+        .then(d => {
+            ALL = d;
+            loadAllPredictions();
+        })
+        .catch(err => {
+            console.error("Failed to load symbols:", err);
+            showError("Failed to load symbols. Make sure backend is running.");
+        });
+}
+
+// Auto-suggest function
+function suggest(t) {
+    if (!t) {
+        document.getElementById("suggestions").innerHTML = "";
+        return;
+    }
+    
+    const filtered = ALL.filter(item => 
+        item.symbol.toUpperCase().startsWith(t.toUpperCase()) ||
+        item.name.toUpperCase().includes(t.toUpperCase())
+    ).slice(0, 8);
+    
+    document.getElementById("suggestions").innerHTML = filtered.map(item => 
+        `<div onclick="selectSym('${item.symbol}')">
+            <div class="suggestion-name">${item.name}</div>
+            <div class="suggestion-symbol">${item.symbol}</div>
+         </div>`
+    ).join("");
+}
+
+function selectSym(s) {
+    document.getElementById("search").value = s;
+    document.getElementById("suggestions").innerHTML = "";
+    showFullReport(s);
+}
+
+// Update market status indicator
+function updateMarketStatus() {
+    fetch(API_BASE + "/market-status")
+        .then(r => r.json())
+        .then(data => {
+            const statusEl = document.getElementById("marketStatus");
+            if (data.is_open) {
+                statusEl.className = "market-status open";
+                statusEl.innerHTML = '<span class="status-dot"></span><span>Market OPEN</span>';
+            } else {
+                statusEl.className = "market-status closed";
+                statusEl.innerHTML = '<span class="status-dot"></span><span>Market CLOSED</span>';
+            }
+        })
+        .catch(err => {
+            console.error("Failed to get market status:", err);
+        });
+}
+
+// Load all predictions
+function loadAllPredictions() {
+    if (isRefreshing) return;
+    isRefreshing = true;
+    
+    // Show skeleton if no cached data
+    if (allPredictions.length === 0) {
+        showSkeleton();
+    }
+    
+fetch(API_BASE + "/predict/all")
+        .then(r => {
+            if (!r.ok) throw new Error('Network response was not ok');
+            return r.json();
+        })
+        .then(d => {
+            allPredictions = d.predictions || [];
+            
+            // Update last updated time
+            if (d.last_updated) {
+                lastUpdatedTime = new Date(d.last_updated);
+                document.getElementById("lastUpdated").textContent = 
+                    `Last updated: ${formatTime(lastUpdatedTime)}`;
+            }
+            
+            // Show warnings if stale
+            if (d.warning) {
+                showToast(d.warning, 'warning');
+            }
+            
+            renderStockList();
+            
+            // Reset countdown
+            secondsLeft = d.seconds_left || 30;
+        })
+        .catch(err => {
+            console.error("Failed to load predictions:", err);
+            showError("Backend server not running. Please start the server.");
+        })
+        .finally(() => {
+            isRefreshing = false;
+        });
+}
+
+// Show skeleton loader
+function showSkeleton() {
+    const list = document.getElementById("stockList");
+    list.innerHTML = `
+        <div class="skeleton skeleton-item"><div class="skeleton-line"></div><div class="skeleton-line"></div></div>
+        <div class="skeleton skeleton-item"><div class="skeleton-line"></div><div class="skeleton-line"></div></div>
+        <div class="skeleton skeleton-item"><div class="skeleton-line"></div><div class="skeleton-line"></div></div>
+        <div class="skeleton skeleton-item"><div class="skeleton-line"></div><div class="skeleton-line"></div></div>
+        <div class="skeleton skeleton-item"><div class="skeleton-line"></div><div class="skeleton-line"></div></div>
+    `;
+}
+
+// Show error message
+function showError(message) {
+    const list = document.getElementById("stockList");
+    list.innerHTML = `<div style="text-align:center; padding:20px; color:#e74c3c;">${message}</div>`;
+    document.getElementById("refreshInfo").innerHTML = 
+        `<span class="warning">❌ Server offline</span><span><button class="refresh-btn" onclick="loadAllPredictions()">Retry</button></span>`;
+}
+
+// Show toast notification
+function showToast(message, type = 'info') {
+    // Simple toast implementation
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 5px;
+        color: white;
+        font-size: 12px;
+        z-index: 1000;
+        animation: fadeIn 0.3s;
+        background: ${type === 'warning' ? 'rgba(231, 76, 60, 0.9)' : 'rgba(46, 204, 113, 0.9)'};
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Render stock list
+function renderStockList() {
+    const list = document.getElementById("stockList");
+    
+    if (allPredictions.length === 0) {
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No predictions available</div>';
+        return;
+    }
+    
+    list.innerHTML = allPredictions.map(p => `
+        <div class="stock-item ${p.direction.toLowerCase()}" 
+             onclick="showFullReport('${p.symbol}')"
+             id="stock-${p.symbol}">
+            <div>
+                <div class="stock-name">${p.name}</div>
+                <div class="stock-symbol">${p.symbol}</div>
+            </div>
+            <div>
+                <div class="stock-direction ${p.direction.toLowerCase()}">
+                    ${p.direction === 'UP' ? '↑' : '↓'} ${p.direction}
+                </div>
+                <div class="stock-price">₹${p.current_price}</div>
+                <div class="prediction-info">Exp: ₹${p.expected_price}</div>
+            </div>
+        </div>
+    `).join("");
+}
+
+// Show full report
+function showFullReport(symbol) {
+    // Find prediction data
+    let pred = allPredictions.find(p => p.symbol === symbol);
+    
+    if (!pred) {
+        // Load single prediction
+        loadSinglePrediction(symbol);
+        return;
+    }
+    
+    selectedStock = symbol;
+    
+    // Highlight selected stock
+    document.querySelectorAll('.stock-item').forEach(el => el.classList.remove('selected'));
+    const selectedEl = document.getElementById(`stock-${symbol}`);
+    if (selectedEl) selectedEl.classList.add('selected');
+    
+    const direction = pred.direction;
+    const directionClass = direction.toLowerCase();
+    const move = ((pred.expected_price - pred.current_price) / pred.current_price * 100).toFixed(2);
+    
+    let html = `
+        <h2>${pred.name} (${pred.symbol})</h2>
+        <p class="subtitle">Click on any stock from the list to see full analysis</p>
+    `;
+    
+    // Add stale warning if applicable
+    if (pred.is_stale) {
+        html += `<div class="stale-warning">⚠️ Using yesterday's closing data (Market Closed)</div>`;
+    }
+    
+    html += `
+        <div class="report-row">
+            <span class="report-label">Direction</span>
+            <span class="report-value ${directionClass}">${pred.direction === 'UP' ? '↑ UP' : '↓ DOWN'}</span>
+        </div>
+        <div class="report-row">
+            <span class="report-label">Current Price</span>
+            <span class="report-value">₹${pred.current_price}</span>
+        </div>
+        <div class="report-row">
+            <span class="report-label">Expected Price</span>
+            <span class="report-value ${directionClass}">₹${pred.expected_price}</span>
+        </div>
+        <div class="report-row">
+            <span class="report-label">Move</span>
+            <span class="report-value ${directionClass}">${pred.direction === 'UP' ? '+' : ''}${move}%</span>
+        </div>
+    `;
+    
+    document.getElementById("fullReport").innerHTML = html;
+    
+    // Load chart
+    loadChart(symbol);
+}
+
+// Load single prediction
+function loadSinglePrediction(symbol) {
+    fetch(API_BASE + "/predict?symbol=" + symbol + "&interval=5m")
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) {
+                document.getElementById("fullReport").innerHTML = `
+                    <h2>${symbol}</h2>
+                    <p style="color:#e74c3c; margin-top:10px;">${d.error}</p>
+                    <p style="color:#888; margin-top:5px;">${d.suggestion || ''}</p>
+                `;
+                return;
+            }
+            
+            selectedStock = symbol;
+            const direction = d.direction;
+            const directionClass = direction.toLowerCase();
+            
+            let html = `
+                <h2>${d.symbol}</h2>
+                <p class="subtitle">Prediction: ${d.prediction_type || 'Intraday'}</p>
+            `;
+            
+            // Add stale warning if applicable
+            if (d.is_stale) {
+                html += `<div class="stale-warning">⚠️ Using yesterday's closing data (Market Closed)</div>`;
+            }
+            
+            html += `
+                <div class="report-row">
+                    <span class="report-label">Direction</span>
+                    <span class="report-value ${directionClass}">${d.direction === 'UP' ? '↑ UP' : '↓ DOWN'}</span>
+                </div>
+                <div class="report-row">
+                    <span class="report-label">Current Price</span>
+                    <span class="report-value">₹${d.current_price}</span>
+                </div>
+                <div class="report-row">
+                    <span class="report-label">Expected Price</span>
+                    <span class="report-value ${directionClass}">₹${d.expected_price}</span>
+                </div>
+                <div class="report-row">
+                    <span class="report-label">Confidence</span>
+                    <span class="report-value">${d.confidence}%</span>
+                </div>
+                <div class="report-row">
+                    <span class="report-label">High Target</span>
+                    <span class="report-value">₹${d.high_target}</span>
+                </div>
+                <div class="report-row">
+                    <span class="report-label">Low Target</span>
+                    <span class="report-value">₹${d.low_target}</span>
+                </div>
+                <div class="report-row">
+                    <span class="report-label">Safe Price</span>
+                    <span class="report-value">₹${d.safe_price}</span>
+                </div>
+            `;
+            
+            document.getElementById("fullReport").innerHTML = html;
+            drawChart(d.prices, d.expected_price);
+        });
+}
+
+// Load chart data
+function loadChart(symbol) {
+    fetch(API_BASE + "/predict?symbol=" + symbol + "&interval=5m")
+        .then(r => r.json())
+        .then(d => {
+            if (!d.error) {
+                drawChart(d.prices, d.expected_price);
+            }
+        });
+}
+
+// Draw chart
+function drawChart(prices, predicted) {
+    const ctx = document.getElementById("priceChart").getContext("2d");
+    
+    if (chart) {
+        chart.destroy();
+    }
+    
+    // Create labels
+    const labels = prices.map((_, i) => i);
+    labels.push("P");
+    
+    // Create data
+    const data = [...prices];
+    data.push(predicted);
+    
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(46, 204, 113, 0.1)');
+    gradient.addColorStop(1, 'rgba(46, 204, 113, 0)');
+    
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                borderColor: "#2ecc71",
+                backgroundColor: gradient,
+                fill: true,
+                tension: 0.3,
+                borderWidth: 2,
+                pointBackgroundColor: (context) => {
+                    const index = context.dataIndex;
+                    return index === data.length - 1 ? "#facc15" : "#2ecc71";
+                },
+                pointRadius: (context) => {
+                    const index = context.dataIndex;
+                    return index === data.length - 1 ? 6 : 2;
+                }
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: '#1a2f40'
+                    },
+                    ticks: {
+                        color: '#888'
+                    }
+                },
+                y: {
+                    grid: {
+                        color: '#1a2f40'
+                    },
+                    ticks: {
+                        color: '#888'
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+}
+
+// Manual refresh
+function manualRefresh() {
+    if (isRefreshing) return;
+    secondsLeft = 30;
+    loadAllPredictions();
+    showToast('Refreshing...', 'info');
+}
+
+// Start countdown timer
+function startCountdown() {
+    if (countdownTimer) clearInterval(countdownTimer);
+    
+    countdownTimer = setInterval(() => {
+        secondsLeft--;
+        
+        if (secondsLeft <= 0) {
+            secondsLeft = 30;
+            loadAllPredictions();
+        }
+        
+        // Update countdown display
+        const countdownEl = document.getElementById("countdown");
+        if (countdownEl) {
+            countdownEl.textContent = `${secondsLeft}s`;
+        }
+    }, 1000);
+}
+
+// Format time helper
+function formatTime(date) {
+    if (!date) return '--';
+    return date.toLocaleTimeString('en-IN', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+// Auto refresh interval
+setInterval(() => {
+    updateMarketStatus();
+}, 60000);
+
+</script>
+
+</body>
+</html>
+
