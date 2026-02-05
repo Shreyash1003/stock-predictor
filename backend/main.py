@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks
+ for yfrom fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import yfinance as yf
 import numpy as np
@@ -14,6 +14,15 @@ import concurrent.futures
 from datetime import datetime, timedelta
 import pytz
 
+# Import news sentiment module
+try:
+    from news_sentiment import get_news_sentiment, adjust_prediction_with_sentiment, get_sentiment_for_all_symbols
+    NEWS_SENTIMENT_ENABLED = True
+    print("News sentiment module loaded successfully")
+except ImportError as e:
+    NEWS_SENTIMENT_ENABLED = False
+    print(f"News sentiment module not available: {e}")
+
 # --------------------------------
 # APP
 # --------------------------------
@@ -27,6 +36,11 @@ app.add_middleware(
 )
 
 # --------------------------------
+# CONFIG
+# --------------------------------
+CACHE_DURATION = 300  # 5 minutes
+PREDICTION_BATCH_SIZE = 50  # Reduced from 100 to 50 for faster loading
+MAX_WORKERS = 30
 # CONFIG
 # --------------------------------
 CACHE_DURATION = 300  # 5 minutes instead of 30 seconds
@@ -137,15 +151,22 @@ def get_prices(symbol, interval="5m"):
         
         # Extract close prices - handle both single-level and multi-level columns
         if isinstance(data.columns, pd.MultiIndex):
-            # Multi-level columns: look for 'Close' in the first level
+            # Multi-level columns: data['Close']['^BSESN'] or data[('Close', '^BSESN')]
+            # The correct way is to access as data['Close']['TICKER'] 
+            # or data[('Close', 'TICKER')] which returns a Series
             close_col = None
-            for col in data.columns:
-                if col[0] == 'Close' or (isinstance(col, str) and col == 'Close'):
-                    close_col = data[col]
-                    break
             
-            if close_col is None:
-                # Fallback: first column
+            # Try to get the Close column properly
+            try:
+                # Check if columns have the expected tuple structure
+                first_col = data.columns[0]
+                if isinstance(first_col, tuple) and len(first_col) >= 2:
+                    # MultiIndex like ('Close', '^BSESN')
+                    ticker = first_col[1]
+                    close_col = data['Close'][ticker]
+                else:
+                    close_col = data['Close']
+            except:
                 close_col = data.iloc[:, 0]
         else:
             # Single-level columns
@@ -263,7 +284,7 @@ def hybrid_predict(prices, model=None):
 # --------------------------------
 @app.get("/predict")
 def predict(symbol: str, interval: str = "5m"):
-    """Get prediction for a single stock"""
+    """Get prediction for a single stock with news sentiment analysis"""
     
     data = get_prices(symbol, interval)
     prices = data["prices"]
@@ -306,6 +327,23 @@ def predict(symbol: str, interval: str = "5m"):
         p_base = 0.5
     
     prob = (p_live * 0.6) + (p_base * 0.4)
+    
+    # Get news sentiment and adjust prediction
+    sentiment_data = {
+        'sentiment': 'neutral',
+        'score': 0.0,
+        'confidence': 'low',
+        'headlines': [],
+        'source': 'disabled'
+    }
+    
+    if NEWS_SENTIMENT_ENABLED:
+        try:
+            sentiment_data = get_news_sentiment(symbol)
+            # Adjust probability based on sentiment
+            prob, adjustment = adjust_prediction_with_sentiment(prob, sentiment_data)
+        except Exception as e:
+            print(f"Error getting sentiment for {symbol}: {e}")
 
     # Adjust prediction based on data type
     if data_type == "intraday":
@@ -336,7 +374,8 @@ def predict(symbol: str, interval: str = "5m"):
         "prices": prices[-60:],
         "prediction_type": label,
         "is_stale": is_stale,
-        "market_status": get_market_status()
+        "market_status": get_market_status(),
+        "sentiment": sentiment_data
     }
 
 # --------------------------------
@@ -415,7 +454,7 @@ def predict_all():
     }
 
 def get_prediction_for_symbol(symbol):
-    """Get prediction for a single symbol (thread-safe)"""
+    """Get prediction for a single symbol (thread-safe) with sentiment"""
     try:
         data = get_prices(symbol, "5m")
         prices = data["prices"]
@@ -425,6 +464,25 @@ def get_prediction_for_symbol(symbol):
         
         current = prices[-1]
         prob = hybrid_predict(prices)
+        
+        # Get sentiment and adjust probability
+        sentiment_info = {
+            'sentiment': 'neutral',
+            'score': 0.0,
+            'confidence': 'low'
+        }
+        
+        if NEWS_SENTIMENT_ENABLED:
+            try:
+                sentiment_data = get_news_sentiment(symbol)
+                prob, _ = adjust_prediction_with_sentiment(prob, sentiment_data)
+                sentiment_info = {
+                    'sentiment': sentiment_data.get('sentiment', 'neutral'),
+                    'score': sentiment_data.get('score', 0.0),
+                    'confidence': sentiment_data.get('confidence', 'low')
+                }
+            except Exception as e:
+                pass
         
         # Adjust move percentage based on data type
         data_type = data.get("type", "daily")
@@ -442,7 +500,8 @@ def get_prediction_for_symbol(symbol):
             "current_price": round(current, 2),
             "direction": direction,
             "expected_price": round(expected, 2),
-            "is_stale": data.get("is_stale", False)
+            "is_stale": data.get("is_stale", False),
+            "sentiment": sentiment_info
         }
     except Exception as e:
         print(f"Error predicting {symbol}: {e}")
@@ -571,5 +630,42 @@ def market_status():
     """Get current market status"""
     return get_market_status()
 
-# Run with: uvicorn main:app --host 0.0.0.0 --port 8001
+@app.get("/")
+def root():
+    """Root endpoint to verify server is running"""
+    return {
+        "status": "ok",
+        "message": "AI Stock Predictor Backend is running",
+        "version": "2.0.0",
+        "news_sentiment_enabled": NEWS_SENTIMENT_ENABLED,
+        "endpoints": {
+            "market_status": "/market-status",
+            "predict": "/predict?symbol=RELIANCE",
+            "predict_all": "/predict/all",
+            "symbols": "/symbols",
+            "alerts": "/alerts",
+            "invest": "/invest",
+            "health": "/health",
+            "news": "/news?symbol=RELIANCE"
+        }
+    }
 
+@app.get("/news")
+def news_sentiment_endpoint(symbol: str):
+    """Get news sentiment for a stock"""
+    if not NEWS_SENTIMENT_ENABLED:
+        return {
+            "error": "News sentiment is not enabled",
+            "message": "Install required dependencies: pip install vaderSentiment requests"
+        }
+    
+    try:
+        sentiment_data = get_news_sentiment(symbol)
+        return {
+            "symbol": symbol,
+            "sentiment": sentiment_data
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+# Run with: uvicorn main:app --host 0.0.0.0 --port 8001

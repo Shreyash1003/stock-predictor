@@ -1,66 +1,85 @@
-# TODO: Stock Predictor Performance Fixes
+# TODO: Advanced News Sentiment Integration
 
-## Phase 1: Backend Optimizations (main.py) ✅ DONE
-- [x] 1.1 Add model caching - train ONCE at startup, reuse for all predictions
-- [x] 1.2 Extend cache duration from 30 seconds to 5 minutes
-- [x] 1.3 Add market status detection (open/closed)
-- [x] 1.4 Implement background prediction scheduler
-- [x] 1.5 Add Redis-like fast in-memory cache
-- [x] 1.6 Fix Sensex/NIFTY price extraction bug
+## Goal: Improve prediction accuracy by incorporating news sentiment analysis
 
-## Phase 2: Frontend Improvements ✅ DONE
-- [x] 2.1 Show cached/stale data immediately on load
-- [x] 2.2 Add loading skeleton UI
-- [x] 2.3 Display "Last Updated" timestamp
-- [x] 2.4 Show market status indicator
-- [x] 2.5 Add visual warning when using stale data
-- [x] 2.6 Configurable API URL for deployment
+### Step 1: Install Required Dependencies
+- `newsapi-python` or use requests for Alpha Vantage
+- `textblob` or `vaderSentiment` for sentiment analysis
 
-## Phase 3: Netlify Deployment ✅ DONE
-- [x] 3.1 Create _redirects file for SPA behavior
-- [x] 3.2 Configure API_BASE variable
+### Step 2: Create News Sentiment Service
+- [x] Create `news_sentiment.py` module
+- [x] Integrate Alpha Vantage News API (free tier: 25 requests/day)
+- [x] Implement sentiment analysis using VADER/TextBlob
+- [x] Cache news data to reduce API calls
 
-## Deployment Instructions
+### Step 3: Update Prediction Model
+- [x] Add sentiment score as additional feature
+- [x] Retrain model with sentiment-weighted predictions
+- [x] Adjust prediction confidence based on news sentiment
 
-### Frontend (Netlify):
-1. Go to https://app.netlify.com
-2. Click "Add new site" → "Import an existing project"
-3. Select your GitHub repo
-4. Build settings:
-   - Build command: (leave empty - plain HTML)
-   - Publish directory: `frontend`
-5. Click "Deploy site"
+### Step 4: Update Backend API
+- [x] Add `/news/{symbol}` endpoint to fetch news sentiment
+- [x] Update `/predict` endpoint to include sentiment data
+- [x] Add sentiment caching (update every 15 minutes)
 
-### Backend (Render/Railway/Heroku):
-Recommended: **Render.com** (free tier available)
+### Step 5: Update Frontend UI
+- [x] Add sentiment indicator to stock list (📈/📉/➡️)
+- [x] Show news sentiment section in full report
+- [x] Display recent news headlines
+- [x] Add confidence adjustment indicator
 
-1. Go to https://render.com and sign up
-2. Click "New" → "Web Service"
-3. Connect your GitHub repo
-4. Settings:
-   - Build command: `pip install -r requirements.txt`
-   - Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-5. Create environment variables:
-   - `PORT`: 8001
-6. Click "Create Web Service"
+### Step 6: Testing & Optimization
+- [ ] Test with various stocks
+- [ ] Monitor API usage limits
+- [ ] Optimize caching strategy
 
-After backend deploys, update frontend:
-```javascript
-// In frontend/index.html, change:
-const API_BASE = "https://your-backend-name.onrender.com";  // Your deployed backend URL
-```
+---
 
-## Project Structure
-```
-Stocks/
-├── backend/
-│   ├── main.py          # FastAPI backend
-│   ├── model.pkl        # Trained ML model
-│   └── ...
-├── frontend/
-│   ├── index.html       # Main UI
-│   ├── _redirects      # Netlify SPA config
-│   └── ...
-└── requirements.txt      # Backend dependencies
-```
+# DEPLOYMENT CHECKLIST
+
+## Phase 1: Backend Deployment (Render.com)
+- [ ] 1.1 Create GitHub repository and push code
+- [ ] 1.2 Sign up at https://render.com
+- [ ] 1.3 Create Web Service:
+      - Name: `stock-predictor-backend`
+      - Root Directory: `backend`
+      - Build Command: `pip install -r requirements.txt`
+      - Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- [ ] 1.4 Add Environment Variables (optional):
+      - `ALPHA_VANTAGE_API_KEY`
+      - `FINNHUB_API_KEY`
+- [ ] 1.5 Get backend URL (e.g., `https://stock-predictor-backend.onrender.com`)
+- [ ] 1.6 Test backend health: `https://your-render-url/health`
+
+## Phase 2: Frontend Deployment (Netlify)
+- [ ] 2.1 Update `frontend/script.js`:
+      - Change `API_BASE` from `http://127.0.0.1:8001` to your Render URL
+- [ ] 2.2 Commit and push changes
+- [ ] 2.3 Sign up at https://netlify.com
+- [ ] 2.4 Deploy frontend:
+      - Base directory: `frontend`
+      - Publish directory: `frontend`
+- [ ] 2.5 Get frontend URL (e.g., `https://stock-predictor.netlify.app`)
+
+## Phase 3: Configuration & Testing
+- [ ] 3.1 Update CORS in `backend/main.py` to allow Netlify domain
+- [ ] 3.2 Redeploy backend (push to GitHub for auto-redeploy)
+- [ ] 3.3 Test full application:
+      - [ ] Open Netlify URL
+      - [ ] Check market status loads
+      - [ ] Search for a stock (e.g., RELIANCE)
+      - [ ] Verify predictions display
+      - [ ] Check news sentiment shows
+- [ ] 3.4 Configure custom domain (optional)
+
+## Troubleshooting
+- [ ] Check browser console for CORS errors
+- [ ] Check Render logs for backend issues
+- [ ] Verify `health` endpoint works
+- [ ] Note: Free tier = backend sleeps after 15 min inactivity
+
+## Estimated Time: 15-20 minutes
+- Backend deploy: ~3-5 minutes
+- Frontend deploy: ~1-2 minutes
+- Configuration & testing: ~10 minutes
 
