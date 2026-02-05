@@ -11,7 +11,7 @@ const alertBox = document.getElementById("alertBox");
 let ALL = [...INDEX_SYMBOLS];
 
 // Load additional symbols from backend
-fetch("http://127.0.0.1:8001/symbols")
+fetch("https://stock-predictor-backendd.onrender.com/symbols")
     .then(r => r.json())
     .then(d => {
         ALL = ALL.concat(d);
@@ -24,7 +24,7 @@ function predict() {
 
     let s = searchInput.value.trim();
 
-    fetch(`http://127.0.0.1:8001/predict?symbol=${s}`)
+    fetch(`https://stock-predictor-backendd.onrender.com/predict?symbol=${s}`)
         .then(r => r.json())
         .then(d => {
 
@@ -95,7 +95,7 @@ function invest() {
         return;
     }
 
-    fetch("http://127.0.0.1:8001/invest", {
+    fetch("https://stock-predictor-backendd.onrender.com/invest", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -118,7 +118,7 @@ function invest() {
 // --------------------
 setInterval(() => {
 
-    fetch("http://127.0.0.1:8001/alerts")
+    fetch("https://stock-predictor-backendd.onrender.com/alerts")
         .then(res => res.json())
         .then(data => {
 
