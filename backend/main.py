@@ -1,4 +1,4 @@
- for yfrom fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import yfinance as yf
 import numpy as np
@@ -36,11 +36,6 @@ app.add_middleware(
 )
 
 # --------------------------------
-# CONFIG
-# --------------------------------
-CACHE_DURATION = 300  # 5 minutes
-PREDICTION_BATCH_SIZE = 50  # Reduced from 100 to 50 for faster loading
-MAX_WORKERS = 30
 # CONFIG
 # --------------------------------
 CACHE_DURATION = 300  # 5 minutes instead of 30 seconds
